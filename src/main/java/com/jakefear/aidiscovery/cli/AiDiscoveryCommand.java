@@ -1,5 +1,7 @@
 package com.jakefear.aidiscovery.cli;
 
+import com.jakefear.aidiscovery.autonomous.AutonomousConfig;
+import com.jakefear.aidiscovery.autonomous.AutonomousDiscoverySession;
 import com.jakefear.aidiscovery.discovery.CostProfile;
 import com.jakefear.aidiscovery.discovery.GapAnalyzer;
 import com.jakefear.aidiscovery.discovery.RelationshipSuggester;
@@ -42,6 +44,13 @@ import java.util.function.Supplier;
                 "  aidiscovery --cost-profile minimal              # Quick prototype mode",
                 "  aidiscovery -c balanced                         # Standard coverage",
                 "  aidiscovery -c comprehensive                    # Full enterprise coverage",
+                "",
+                "Autonomous Mode (I Feel Lucky):",
+                "  aidiscovery --ifeellucky \"Kubernetes\"           # Fully automated discovery",
+                "  aidiscovery -L \"ML\" -d \"For Python devs\"        # With description",
+                "  aidiscovery -L \"Security\" -s \"IAM,Encryption\"   # With seed topics",
+                "  aidiscovery -L \"Docker\" -c comprehensive        # With cost profile",
+                "  aidiscovery -L \"APIs\" --confirm                 # Pause for approval",
                 "",
                 "List and Show Universes:",
                 "  aidiscovery --list                              # List all saved universes",
@@ -112,6 +121,37 @@ public class AiDiscoveryCommand implements Callable<Integer> {
     @Option(names = {"--key-file"},
             description = "Path to file containing Anthropic API key")
     private Path keyFile;
+
+    // ===== Autonomous Mode Options =====
+
+    @Option(names = {"--ifeellucky", "-L"},
+            description = "Fully autonomous universe generation. Provide domain name as value.",
+            paramLabel = "<domain>")
+    private String ifeelluckyDomain;
+
+    @Option(names = {"--description", "-d"},
+            description = "Description of wiki goals, audience, and focus (for --ifeellucky mode)")
+    private String autonomousDescription;
+
+    @Option(names = {"--seeds", "-s"},
+            description = "Additional seed topics, comma-separated (for --ifeellucky mode)")
+    private String seedTopics;
+
+    @Option(names = {"--confirm"},
+            description = "Pause after scope inference for user approval (for --ifeellucky mode)")
+    private boolean confirmBeforeProceeding;
+
+    @Option(names = {"--confidence"},
+            description = "Minimum confidence for auto-acceptance, 0.0-1.0 (default: 0.75)")
+    private Double confidenceThreshold;
+
+    @Option(names = {"--dry-run"},
+            description = "Show what would be generated without saving (for --ifeellucky mode)")
+    private boolean dryRun;
+
+    @Option(names = {"-o", "--output"},
+            description = "Custom output path for universe JSON (for --ifeellucky mode)")
+    private Path outputPath;
 
     /**
      * Capture Spring Boot properties (--property.name=value) that picocli doesn't recognize.
@@ -207,6 +247,11 @@ public class AiDiscoveryCommand implements Callable<Integer> {
             // Handle export universe
             if (exportArgs != null && exportArgs.length == 2) {
                 return exportUniverse(out);
+            }
+
+            // Handle autonomous mode
+            if (ifeelluckyDomain != null && !ifeelluckyDomain.isBlank()) {
+                return runAutonomousMode(in, out);
             }
 
             // Default: run interactive discovery session
@@ -366,6 +411,94 @@ public class AiDiscoveryCommand implements Callable<Integer> {
         } catch (Exception e) {
             out.println();
             out.println("ERROR in discovery mode: " + e.getMessage());
+            if (verbose) {
+                e.printStackTrace(out);
+            }
+            return 1;
+        }
+    }
+
+    /**
+     * Run the autonomous "I Feel Lucky" discovery mode.
+     */
+    private Integer runAutonomousMode(BufferedReader in, PrintWriter out) {
+        try {
+            // Parse cost profile
+            CostProfile costProfile = CostProfile.BALANCED;
+            if (costProfileStr != null && !costProfileStr.isBlank()) {
+                CostProfile parsed = CostProfile.fromName(costProfileStr);
+                if (parsed != null) {
+                    costProfile = parsed;
+                }
+            }
+
+            // Parse seed topics
+            java.util.List<String> seeds = java.util.Collections.emptyList();
+            if (seedTopics != null && !seedTopics.isBlank()) {
+                seeds = java.util.Arrays.stream(seedTopics.split(","))
+                        .map(String::trim)
+                        .filter(s -> !s.isEmpty())
+                        .toList();
+            }
+
+            // Build autonomous configuration
+            AutonomousConfig config = AutonomousConfig.builder(ifeelluckyDomain)
+                    .description(autonomousDescription != null ? autonomousDescription : "")
+                    .seeds(seeds)
+                    .costProfile(costProfile)
+                    .outputPath(outputPath)
+                    .confidenceThreshold(confidenceThreshold != null ? confidenceThreshold : AutonomousConfig.DEFAULT_CONFIDENCE_THRESHOLD)
+                    .confirmBeforeProceeding(confirmBeforeProceeding)
+                    .dryRun(dryRun)
+                    .verbose(verbose)
+                    .build();
+
+            // Create and run autonomous session
+            AutonomousDiscoverySession autonomousSession = new AutonomousDiscoverySession(
+                    in,
+                    out,
+                    topicExpanderSupplier.get(),
+                    relationshipSuggesterSupplier.get(),
+                    gapAnalyzerSupplier.get(),
+                    config
+            );
+
+            TopicUniverse universe = autonomousSession.run();
+
+            if (universe == null) {
+                // User cancelled or dry run
+                return 0;
+            }
+
+            // Save the universe (unless dry run)
+            if (!dryRun) {
+                TopicUniverseRepository repository = universeRepositorySupplier.get();
+                Path savedPath;
+                if (outputPath != null) {
+                    savedPath = repository.saveToPath(universe, outputPath);
+                } else {
+                    savedPath = repository.save(universe);
+                }
+
+                out.println();
+                out.println("═".repeat(67));
+                out.println("Autonomous discovery complete!");
+                out.println();
+                out.printf("  ID:       %s%n", universe.id());
+                out.printf("  Name:     %s%n", universe.name());
+                out.printf("  Topics:   %d accepted%n", universe.getAcceptedCount());
+                out.printf("  Location: %s%n", savedPath);
+                out.println();
+                out.println("To generate articles from this universe, use:");
+                out.printf("  aipublisher --universe %s%n", universe.id());
+                out.println("═".repeat(67));
+            }
+
+            return 0;
+
+        } catch (Exception e) {
+            out.println();
+            out.println("ERROR in autonomous mode: " + e.getMessage());
             if (verbose) {
                 e.printStackTrace(out);
             }

@@ -64,6 +64,12 @@ Central lookup for typed implementations.
 ## Package Structure
 
 ```
+autonomous/           # Autonomous "I Feel Lucky" mode
+  AutonomousConfig        # Configuration record with builder
+  AutonomousCurator       # AI-powered ACCEPT/REJECT/DEFER decisions
+  AutonomousDiscoverySession  # Main orchestrator
+  AutonomousScopeInferrer # Infers scope from user description
+  StoppingCriteria        # Convergence detection
 cli/
   curation/           # Command pattern - user actions
     topic/            # Topic curation commands
@@ -110,6 +116,48 @@ public enum CurationAction {
 }
 ```
 
+## Key APIs
+
+### JsonParsingUtils (util/)
+Use for parsing LLM responses that contain JSON:
+```java
+// Extract and parse JSON from LLM response (handles markdown code blocks)
+JsonNode root = JsonParsingUtils.parseJson(response);
+
+// Get field with default fallback
+String value = JsonParsingUtils.getStringOrDefault(root, "field", "default");
+
+// Parse string array from field
+List<String> items = JsonParsingUtils.parseStringArray(root, "arrayField");
+```
+
+### DiscoverySession (discovery/)
+Central state manager - use mutation methods:
+```java
+session.addSeedTopic(name, description);
+session.acceptTopicSuggestion(suggestion);
+session.confirmRelationship(suggestion);
+session.buildUniverse();  // Returns TopicUniverse snapshot
+session.getScope();       // Returns ScopeConfiguration
+session.getAcceptedTopicCount();
+```
+
+### TopicSuggestion Scoring (discovery/)
+For autonomous decisions, use combined scoring:
+```java
+double score = suggestion.getCombinedScore();  // Weighted relevance + search confidence
+boolean highQuality = suggestion.meetsAutonomousThreshold(0.75);
+boolean lowQuality = suggestion.shouldAutoReject();
+```
+
+### CostProfile Bounds (discovery/)
+Each cost profile has autonomous bounds:
+```java
+profile.autonomousMinTopics()  // Stop expanding below this
+profile.autonomousMaxTopics()  // Hard cap
+profile.convergenceThreshold() // Quality threshold (0.3-0.5)
+```
+
 ## Testing
 
 **Run all tests:**
@@ -143,16 +191,26 @@ mvn package           # Build JAR
 java -jar target/aidiscovery.jar --help
 java -jar target/aidiscovery.jar --discover
 java -jar target/aidiscovery.jar --list
+
+# Autonomous mode
+java -jar target/aidiscovery.jar --ifeellucky "Domain Name" \
+    -d "Description for the AI" \
+    -c balanced \
+    --llm.provider=ollama \
+    --ollama.base-url=http://inference.jakefear.com:11434 \
+    -v
 ```
 
 ## Key Files
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `DiscoveryInteractiveSession.java` | 1,122 | Main session orchestrator |
+| `DiscoveryInteractiveSession.java` | 1,122 | Main interactive session orchestrator |
+| `AutonomousDiscoverySession.java` | 413 | Autonomous mode orchestrator |
 | `TopicExpander.java` | 616 | LLM-powered topic suggestions |
 | `TopicUniverse.java` | 479 | Domain aggregate root |
-| `AiDiscoveryCommand.java` | 437 | CLI entry point |
+| `AiDiscoveryCommand.java` | 500+ | CLI entry point with autonomous options |
+| `AutonomousCurator.java` | 315 | AI-powered curation decisions |
 
 ## Development Guidelines
 

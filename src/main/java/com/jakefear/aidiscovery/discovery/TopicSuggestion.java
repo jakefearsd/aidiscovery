@@ -88,6 +88,40 @@ public record TopicSuggestion(
     }
 
     /**
+     * Get combined score for autonomous curation decisions.
+     * Weighs relevance and search confidence to produce a single quality score.
+     *
+     * @return Score from 0.0 to 1.0
+     */
+    public double getCombinedScore() {
+        if (searchConfidence < 0) {
+            // Not search-validated: penalize but still consider relevance
+            return relevanceScore * 0.7;
+        }
+        // Weighted combination: relevance matters more than search confirmation
+        return (relevanceScore * 0.6) + (searchConfidence * 0.4);
+    }
+
+    /**
+     * Check if this suggestion meets the threshold for autonomous acceptance.
+     *
+     * @param threshold Minimum combined score (typically 0.75)
+     * @return true if suggestion should be auto-accepted
+     */
+    public boolean meetsAutonomousThreshold(double threshold) {
+        return getCombinedScore() >= threshold && searchConfidence >= 0.3;
+    }
+
+    /**
+     * Check if this suggestion should be auto-rejected (likely low quality or hallucinated).
+     *
+     * @return true if suggestion should be auto-rejected
+     */
+    public boolean shouldAutoReject() {
+        return getCombinedScore() < 0.4 || (isSearchValidated() && searchConfidence < 0.2);
+    }
+
+    /**
      * Get a confidence indicator for display.
      */
     public String getConfidenceIndicator() {

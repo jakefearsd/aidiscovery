@@ -67,6 +67,13 @@ public class TopicExpander {
     }
 
     /**
+     * Get the underlying chat model for use by other components.
+     */
+    public ChatLanguageModel getModel() {
+        return model;
+    }
+
+    /**
      * Expand a seed topic into related topic suggestions.
      *
      * @param seedTopic The topic to expand from
