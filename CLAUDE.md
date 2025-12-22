@@ -1,0 +1,172 @@
+# CLAUDE.md - AI Discovery Development Guidelines
+
+## Project Overview
+
+AI Discovery is an interactive CLI tool for building topic universes through a guided 8-phase workflow. It uses LLM-powered suggestions with human-in-the-loop curation.
+
+**Stats:** ~7,600 LOC, 57 source files, 12 test files, 222 tests
+
+## Core Workflow
+
+```
+SEED_INPUT → SCOPE_SETUP → TOPIC_EXPANSION → RELATIONSHIP_MAPPING
+     → GAP_ANALYSIS → DEPTH_CALIBRATION → PRIORITIZATION → REVIEW → COMPLETE
+```
+
+Each phase is handled by a `PhaseHandler` implementation (State pattern).
+
+## Design Patterns
+
+### Command Pattern
+**Location:** `cli/curation/`
+
+User curation actions are encapsulated as commands:
+```java
+public interface CurationCommand<T> {
+    CurationResult execute(T suggestion, DiscoverySession session, ConsoleInputHelper input);
+    CurationAction getAction();
+}
+```
+
+Implementations: `AcceptTopicCommand`, `RejectTopicCommand`, `ModifyTopicCommand`, `DeferTopicCommand`
+
+**Factory:** `TopicCurationCommandFactory`, `RelationshipCurationCommandFactory`
+
+### State Pattern
+**Location:** `cli/phase/`, `discovery/DiscoveryPhase`
+
+Discovery workflow phases with explicit transitions:
+```java
+public interface PhaseHandler {
+    DiscoveryPhase getPhase();
+    PhaseResult execute(PhaseContext context);
+}
+```
+
+The `DiscoveryPhase` enum defines valid transitions via `next()` and `previous()`.
+
+### Builder Pattern
+**Location:** `domain/Topic`, `domain/DomainContext`, `domain/ScopeConfiguration`
+
+Complex domain objects use builders:
+```java
+Topic topic = Topic.builder("Machine Learning")
+    .withDescription("Introduction to ML")
+    .withComplexity(ComplexityLevel.INTERMEDIATE)
+    .build();
+```
+
+### Registry Pattern
+**Location:** `search/SearchProviderRegistry`, `cli/phase/PhaseHandlerRegistry`
+
+Central lookup for typed implementations.
+
+## Package Structure
+
+```
+cli/
+  curation/           # Command pattern - user actions
+    topic/            # Topic curation commands
+    relationship/     # Relationship curation commands
+  input/              # Console input helpers
+  phase/              # State pattern - phase handlers
+config/               # Spring configuration
+discovery/            # Core discovery logic (TopicExpander, GapAnalyzer, etc.)
+domain/               # Domain model (Topic, TopicUniverse, etc.)
+search/               # Search providers (Wikipedia)
+util/                 # JSON parsing utilities
+```
+
+## Code Conventions
+
+### Java Records for Value Objects
+```java
+public record TopicSuggestion(
+    String name,
+    String description,
+    String rationale,
+    ComplexityLevel complexity
+) { }
+```
+
+### Enums with Behavior
+```java
+public enum DiscoveryPhase {
+    SEED_INPUT, SCOPE_SETUP, ...;
+
+    public DiscoveryPhase next() { }
+    public boolean isSkippable() { }
+}
+```
+
+### CurationAction Parsing
+```java
+public enum CurationAction {
+    ACCEPT, REJECT, MODIFY, DEFER, SKIP_REST;
+
+    public static CurationAction parse(String input) {
+        // Handles shortcuts: "a", "accept", "1", etc.
+    }
+}
+```
+
+## Testing
+
+**Run all tests:**
+```bash
+mvn test
+```
+
+**Test organization:** Nested classes by behavior
+```java
+class TopicSuggestionTest {
+    @Nested class BuilderTests { }
+    @Nested class Validation { }
+}
+```
+
+## Integration with aipublisher
+
+Both projects share the `TopicUniverse` JSON format:
+- **Storage:** `~/.aipublisher/universes/`
+- **Format:** `{id}.universe.json`
+
+Workflow:
+1. `aidiscovery --discover` → creates universe
+2. `aipublisher --universe {id}` → generates articles
+
+## Build Commands
+
+```bash
+mvn test              # Run tests
+mvn package           # Build JAR
+java -jar target/aidiscovery.jar --help
+java -jar target/aidiscovery.jar --discover
+java -jar target/aidiscovery.jar --list
+```
+
+## Key Files
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `DiscoveryInteractiveSession.java` | 1,122 | Main session orchestrator |
+| `TopicExpander.java` | 616 | LLM-powered topic suggestions |
+| `TopicUniverse.java` | 479 | Domain aggregate root |
+| `AiDiscoveryCommand.java` | 437 | CLI entry point |
+
+## Development Guidelines
+
+1. **Add commands via factory** - New curation actions go through `*CurationCommandFactory`
+2. **Add phases via registry** - New phases implement `PhaseHandler` and register in `PhaseHandlerRegistry`
+3. **Keep DiscoveryInteractiveSession focused** - Extract complex logic to phase handlers
+4. **Test curation flows** - Each command needs tests for execute behavior
+
+## Anti-Patterns to Avoid
+
+- **Bypassing factories** - Always use factories to get commands
+- **Direct phase transitions** - Use `DiscoveryPhase.next()` not hardcoded values
+- **Modifying TopicUniverse directly** - Use its mutation methods that maintain invariants
+
+---
+
+*Sibling project: [aipublisher](https://github.com/jakefearsd/aipublisher)*
