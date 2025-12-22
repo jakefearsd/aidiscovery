@@ -1,0 +1,12 @@
+/home/jakefear/source/aidiscovery/src/test/java/com/jakefear/aidiscovery/cli/curation/CurationActionTest.java
+/home/jakefear/source/aidiscovery/src/test/java/com/jakefear/aidiscovery/discovery/CostProfileTest.java
+/home/jakefear/source/aidiscovery/src/test/java/com/jakefear/aidiscovery/discovery/DiscoveryPhaseTest.java
+/home/jakefear/source/aidiscovery/src/test/java/com/jakefear/aidiscovery/discovery/DiscoverySessionTest.java
+/home/jakefear/source/aidiscovery/src/test/java/com/jakefear/aidiscovery/discovery/RelationshipDepthTest.java
+/home/jakefear/source/aidiscovery/src/test/java/com/jakefear/aidiscovery/discovery/RelationshipSuggestionTest.java
+/home/jakefear/source/aidiscovery/src/test/java/com/jakefear/aidiscovery/discovery/TopicSuggestionTest.java
+/home/jakefear/source/aidiscovery/src/test/java/com/jakefear/aidiscovery/domain/DomainContextTest.java
+/home/jakefear/source/aidiscovery/src/test/java/com/jakefear/aidiscovery/domain/ScopeConfigurationTest.java
+/home/jakefear/source/aidiscovery/src/test/java/com/jakefear/aidiscovery/domain/TopicRelationshipTest.java
+/home/jakefear/source/aidiscovery/src/test/java/com/jakefear/aidiscovery/domain/TopicTest.java
+/home/jakefear/source/aidiscovery/src/test/java/com/jakefear/aidiscovery/domain/TopicUniverseTest.java
