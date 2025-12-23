@@ -343,9 +343,7 @@ public class DiscoveryInteractiveSession {
 
         InputResponse assumedResponse = input.promptOptional("Assumed knowledge", null);
         if (assumedResponse.hasValue()) {
-            Arrays.stream(assumedResponse.value().split(","))
-                    .map(String::trim)
-                    .filter(s -> !s.isEmpty())
+            ConsoleInputHelper.parseCommaSeparated(assumedResponse.value())
                     .forEach(scopeBuilder::addAssumedKnowledge);
         }
 
@@ -355,9 +353,7 @@ public class DiscoveryInteractiveSession {
 
         InputResponse excludeResponse = input.promptOptional("Out of scope", null);
         if (excludeResponse.hasValue()) {
-            Arrays.stream(excludeResponse.value().split(","))
-                    .map(String::trim)
-                    .filter(s -> !s.isEmpty())
+            ConsoleInputHelper.parseCommaSeparated(excludeResponse.value())
                     .forEach(scopeBuilder::addOutOfScope);
         }
 
@@ -367,9 +363,7 @@ public class DiscoveryInteractiveSession {
 
         InputResponse focusResponse = input.promptOptional("Focus areas", null);
         if (focusResponse.hasValue()) {
-            Arrays.stream(focusResponse.value().split(","))
-                    .map(String::trim)
-                    .filter(s -> !s.isEmpty())
+            ConsoleInputHelper.parseCommaSeparated(focusResponse.value())
                     .forEach(scopeBuilder::addFocusArea);
         }
 

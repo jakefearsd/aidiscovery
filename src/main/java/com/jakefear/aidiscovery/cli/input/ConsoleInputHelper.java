@@ -3,6 +3,7 @@ package com.jakefear.aidiscovery.cli.input;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
@@ -298,6 +299,25 @@ public class ConsoleInputHelper {
      */
     public void flush() {
         out.flush();
+    }
+
+    // ==================== Static Utility Methods ====================
+
+    /**
+     * Parse a comma-separated string into a list of trimmed, non-empty values.
+     * Useful for processing user input like "item1, item2, item3".
+     *
+     * @param input The comma-separated string (may be null or blank)
+     * @return List of trimmed values, empty list if input is null/blank
+     */
+    public static List<String> parseCommaSeparated(String input) {
+        if (input == null || input.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(input.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
     }
 
     // Command detection helpers

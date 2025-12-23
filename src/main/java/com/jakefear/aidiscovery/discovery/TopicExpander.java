@@ -19,7 +19,6 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * AI service that expands a seed topic into related topic suggestions.
@@ -363,65 +362,14 @@ public class TopicExpander {
             List<String> searchRelated,
             String suggestionsRange) {
 
-        StringBuilder prompt = new StringBuilder();
-
-        prompt.append("## Domain Context\n");
-        prompt.append("Domain: ").append(domainName).append("\n\n");
-
-        prompt.append("## Seed Topic to Expand\n");
-        prompt.append("Topic: ").append(seedTopic).append("\n");
-
-        // Include search context
-        if (topicInfo != null) {
-            prompt.append("Summary from search: ").append(topicInfo.snippet()).append("\n");
-        }
-
-        if (!searchRelated.isEmpty()) {
-            prompt.append("Related topics from search: ");
-            prompt.append(String.join(", ", searchRelated.subList(0, Math.min(15, searchRelated.size()))));
-            prompt.append("\n");
-        }
-        prompt.append("\n");
-
-        if (!existingTopics.isEmpty()) {
-            prompt.append("## Existing Topics (do not suggest duplicates)\n");
-            prompt.append(existingTopics.stream()
-                    .sorted()
-                    .collect(Collectors.joining(", ")));
-            prompt.append("\n\n");
-        }
-
-        if (scope != null) {
-            appendScopeGuidance(prompt, scope);
-        }
-
-        prompt.append(String.format("""
-            ## Task
-            Analyze the seed topic and suggest %s related topics that would help create a comprehensive wiki.
-            Focus on topics that directly support understanding or applying the seed topic.
-
-            IMPORTANT: Prefer suggesting topics that appear in the "Related topics from search" list or are
-            closely related to them. This helps ensure topic suggestions are grounded in real knowledge.
-
-            Respond with JSON in this format:
-            ```json
-            {
-              "suggestions": [
-                {
-                  "name": "Topic Name",
-                  "description": "Brief description of what this topic covers",
-                  "category": "prerequisite|component|related|application|advanced",
-                  "contentType": "CONCEPT|TUTORIAL|REFERENCE|HOW_TO|COMPARISON|TROUBLESHOOTING",
-                  "complexity": "BEGINNER|INTERMEDIATE|ADVANCED",
-                  "relevance": 0.85,
-                  "rationale": "Why this topic is important for the wiki"
-                }
-              ]
-            }
-            ```
-            """, suggestionsRange));
-
-        return prompt.toString();
+        return TopicPromptBuilder.create()
+                .addDomainContext(domainName)
+                .addSeedTopic(seedTopic)
+                .addSearchContext(topicInfo, searchRelated)
+                .addExistingTopics(existingTopics)
+                .addScopeGuidance(scope)
+                .addSearchGroundedTask(suggestionsRange)
+                .build();
     }
 
     private String buildPrompt(
@@ -431,50 +379,14 @@ public class TopicExpander {
             ScopeConfiguration scope,
             String suggestionsRange) {
 
-        StringBuilder prompt = new StringBuilder();
-
-        prompt.append("## Domain Context\n");
-        prompt.append("Domain: ").append(domainName).append("\n\n");
-
-        prompt.append("## Seed Topic to Expand\n");
-        prompt.append("Topic: ").append(seedTopic).append("\n\n");
-
-        if (!existingTopics.isEmpty()) {
-            prompt.append("## Existing Topics (do not suggest duplicates)\n");
-            prompt.append(existingTopics.stream()
-                    .sorted()
-                    .collect(Collectors.joining(", ")));
-            prompt.append("\n\n");
-        }
-
-        if (scope != null) {
-            appendScopeGuidance(prompt, scope);
-        }
-
-        prompt.append(String.format("""
-            ## Task
-            Analyze the seed topic and suggest %s related topics that would help create a comprehensive wiki.
-            Focus on topics that directly support understanding or applying the seed topic.
-
-            Respond with JSON in this format:
-            ```json
-            {
-              "suggestions": [
-                {
-                  "name": "Topic Name",
-                  "description": "Brief description of what this topic covers",
-                  "category": "prerequisite|component|related|application|advanced",
-                  "contentType": "CONCEPT|TUTORIAL|REFERENCE|HOW_TO|COMPARISON|TROUBLESHOOTING",
-                  "complexity": "BEGINNER|INTERMEDIATE|ADVANCED",
-                  "relevance": 0.85,
-                  "rationale": "Why this topic is important for the wiki"
-                }
-              ]
-            }
-            ```
-            """, suggestionsRange));
-
-        return prompt.toString();
+        return TopicPromptBuilder.create()
+                .addDomainContext(domainName)
+                .addSeedTopic(seedTopic)
+                .addNewline()
+                .addExistingTopics(existingTopics)
+                .addScopeGuidance(scope)
+                .addStandardTask(suggestionsRange)
+                .build();
     }
 
     private String buildInitialTopicsPrompt(
@@ -482,76 +394,11 @@ public class TopicExpander {
             String domainDescription,
             ScopeConfiguration scope) {
 
-        StringBuilder prompt = new StringBuilder();
-
-        prompt.append("## Domain\n");
-        prompt.append("Name: ").append(domainName).append("\n");
-        if (domainDescription != null && !domainDescription.isBlank()) {
-            prompt.append("Description: ").append(domainDescription).append("\n");
-        }
-        prompt.append("\n");
-
-        if (scope != null) {
-            appendScopeGuidance(prompt, scope);
-        }
-
-        prompt.append("""
-            ## Task
-            Analyze this domain and suggest 10-15 foundational topics that would form the core of a comprehensive wiki.
-            Include a mix of:
-            - Core concepts that define the domain
-            - Practical tutorials for hands-on learning
-            - Reference material for ongoing use
-            - Comparisons with alternatives where relevant
-
-            Respond with JSON in this format:
-            ```json
-            {
-              "suggestions": [
-                {
-                  "name": "Topic Name",
-                  "description": "Brief description of what this topic covers",
-                  "category": "core|foundation|practical|reference|comparison",
-                  "contentType": "CONCEPT|TUTORIAL|REFERENCE|HOW_TO|COMPARISON|TROUBLESHOOTING",
-                  "complexity": "BEGINNER|INTERMEDIATE|ADVANCED",
-                  "relevance": 0.85,
-                  "rationale": "Why this topic is essential for the wiki"
-                }
-              ]
-            }
-            ```
-            """);
-
-        return prompt.toString();
-    }
-
-    private void appendScopeGuidance(StringBuilder prompt, ScopeConfiguration scope) {
-        prompt.append("## Scope Guidance\n");
-
-        if (!scope.assumedKnowledge().isEmpty()) {
-            prompt.append("Assumed reader knowledge (do not cover): ");
-            prompt.append(String.join(", ", scope.assumedKnowledge()));
-            prompt.append("\n");
-        }
-
-        if (!scope.outOfScope().isEmpty()) {
-            prompt.append("Out of scope (exclude): ");
-            prompt.append(String.join(", ", scope.outOfScope()));
-            prompt.append("\n");
-        }
-
-        if (!scope.focusAreas().isEmpty()) {
-            prompt.append("Focus areas (prioritize): ");
-            prompt.append(String.join(", ", scope.focusAreas()));
-            prompt.append("\n");
-        }
-
-        if (scope.audienceDescription() != null && !scope.audienceDescription().isBlank()) {
-            prompt.append("Target audience: ").append(scope.audienceDescription());
-            prompt.append("\n");
-        }
-
-        prompt.append("\n");
+        return TopicPromptBuilder.create()
+                .addDomainWithDescription(domainName, domainDescription)
+                .addScopeGuidance(scope)
+                .addInitialTopicsTask()
+                .build();
     }
 
     private List<TopicSuggestion> parseResponse(String response, String sourceContext)

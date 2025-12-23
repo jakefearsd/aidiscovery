@@ -240,11 +240,7 @@ public class AutonomousCurator {
         String action = JsonParsingUtils.getStringOrDefault(root, "action", "DEFER").toUpperCase();
         String reasoning = JsonParsingUtils.getStringOrDefault(root, "reasoning", "AI decision");
 
-        return switch (action) {
-            case "ACCEPT" -> CurationDecision.accept(reasoning);
-            case "REJECT" -> CurationDecision.reject(reasoning);
-            default -> CurationDecision.defer(reasoning);
-        };
+        return decisionFromAction(action, reasoning);
     }
 
     private List<CurationDecision> parseBatchCurationResponse(String response, int expectedCount)
@@ -257,12 +253,7 @@ public class AutonomousCurator {
             for (JsonNode decision : decisions) {
                 String action = JsonParsingUtils.getStringOrDefault(decision, "action", "DEFER").toUpperCase();
                 String reasoning = JsonParsingUtils.getStringOrDefault(decision, "reasoning", "AI decision");
-
-                result.add(switch (action) {
-                    case "ACCEPT" -> CurationDecision.accept(reasoning);
-                    case "REJECT" -> CurationDecision.reject(reasoning);
-                    default -> CurationDecision.defer(reasoning);
-                });
+                result.add(decisionFromAction(action, reasoning));
             }
         }
 
@@ -272,6 +263,14 @@ public class AutonomousCurator {
         }
 
         return result;
+    }
+
+    private CurationDecision decisionFromAction(String action, String reasoning) {
+        return switch (action) {
+            case "ACCEPT" -> CurationDecision.accept(reasoning);
+            case "REJECT" -> CurationDecision.reject(reasoning);
+            default -> CurationDecision.defer(reasoning);
+        };
     }
 
     /**

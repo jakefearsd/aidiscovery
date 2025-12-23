@@ -2,6 +2,8 @@ package com.jakefear.aidiscovery.cli.curation.relationship;
 
 import com.jakefear.aidiscovery.cli.curation.CurationAction;
 import com.jakefear.aidiscovery.cli.curation.CurationCommand;
+import com.jakefear.aidiscovery.cli.curation.SimpleCurationCommand;
+import com.jakefear.aidiscovery.discovery.DiscoverySession;
 import com.jakefear.aidiscovery.discovery.RelationshipSuggestion;
 
 /**
@@ -9,8 +11,10 @@ import com.jakefear.aidiscovery.discovery.RelationshipSuggestion;
  */
 public class RelationshipCurationCommandFactory {
 
-    private final ConfirmRelationshipCommand confirmCommand = new ConfirmRelationshipCommand();
-    private final RejectRelationshipCommand rejectCommand = new RejectRelationshipCommand();
+    private final CurationCommand<RelationshipSuggestion> confirmCommand = new SimpleCurationCommand<>(
+            CurationAction.CONFIRM, "Confirmed", DiscoverySession::confirmRelationship);
+    private final CurationCommand<RelationshipSuggestion> rejectCommand = new SimpleCurationCommand<>(
+            CurationAction.REJECT, "Rejected", DiscoverySession::rejectRelationship);
     private final ChangeTypeRelationshipCommand changeTypeCommand = new ChangeTypeRelationshipCommand();
 
     /**

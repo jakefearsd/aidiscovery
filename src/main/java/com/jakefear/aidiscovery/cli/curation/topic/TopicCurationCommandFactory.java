@@ -2,6 +2,8 @@ package com.jakefear.aidiscovery.cli.curation.topic;
 
 import com.jakefear.aidiscovery.cli.curation.CurationAction;
 import com.jakefear.aidiscovery.cli.curation.CurationCommand;
+import com.jakefear.aidiscovery.cli.curation.SimpleCurationCommand;
+import com.jakefear.aidiscovery.discovery.DiscoverySession;
 import com.jakefear.aidiscovery.discovery.TopicSuggestion;
 
 import java.util.List;
@@ -11,9 +13,12 @@ import java.util.List;
  */
 public class TopicCurationCommandFactory {
 
-    private final AcceptTopicCommand acceptCommand = new AcceptTopicCommand();
-    private final RejectTopicCommand rejectCommand = new RejectTopicCommand();
-    private final DeferTopicCommand deferCommand = new DeferTopicCommand();
+    private final CurationCommand<TopicSuggestion> acceptCommand = new SimpleCurationCommand<>(
+            CurationAction.ACCEPT, "Accepted", DiscoverySession::acceptTopicSuggestion);
+    private final CurationCommand<TopicSuggestion> rejectCommand = new SimpleCurationCommand<>(
+            CurationAction.REJECT, "Rejected", DiscoverySession::rejectTopicSuggestion);
+    private final CurationCommand<TopicSuggestion> deferCommand = new SimpleCurationCommand<>(
+            CurationAction.DEFER, "Deferred to backlog", DiscoverySession::deferTopicSuggestion);
     private final ModifyTopicCommand modifyCommand = new ModifyTopicCommand();
 
     /**
