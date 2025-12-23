@@ -54,6 +54,9 @@ public class LlmConfig {
     @Value("${llm.temperature.research:0.3}")
     private double researchTemperature;
 
+    @Value("${llm.temperature.curation:0.2}")
+    private double curationTemperature;
+
     /**
      * Default chat model for general use.
      */
@@ -65,11 +68,20 @@ public class LlmConfig {
 
     /**
      * Chat model configured for research tasks (lower temperature for factual accuracy).
-     * Used by TopicExpander, RelationshipSuggester, GapAnalyzer.
+     * Used by TopicExpander, RelationshipSuggester, GapAnalyzer, ScopeInferrer.
      */
     @Bean
     public ChatLanguageModel researchChatModel() {
         return buildModel(researchTemperature);
+    }
+
+    /**
+     * Chat model configured for curation decisions (lowest temperature for consistency).
+     * Used by AutonomousCurator for ACCEPT/REJECT/DEFER decisions.
+     */
+    @Bean
+    public ChatLanguageModel curationModel() {
+        return buildModel(curationTemperature);
     }
 
     private ChatLanguageModel buildModel(double temperature) {

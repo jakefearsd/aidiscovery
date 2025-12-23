@@ -46,7 +46,7 @@ public class AutonomousCurator {
         Always respond with valid JSON in the specified format.
         """;
 
-    public AutonomousCurator(@Qualifier("researchChatModel") ChatLanguageModel model) {
+    public AutonomousCurator(@Qualifier("curationModel") ChatLanguageModel model) {
         this.model = model;
         this.objectMapper = new ObjectMapper();
     }
