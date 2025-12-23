@@ -49,7 +49,7 @@ export ANTHROPIC_API_KEY='your-api-key-here'
 
 **Option B: Ollama (Local Inference - Free)**
 ```bash
-ollama pull qwen2.5:14b
+ollama pull qwen3:14b
 java -jar target/aidiscovery.jar --llm.provider=ollama
 ```
 
@@ -555,7 +555,7 @@ LLM Provider Options:
                              LLM provider: "anthropic" or "ollama" (default: anthropic)
       --ollama.base-url=<url>
                              Ollama server URL (default: http://localhost:11434)
-      --ollama.model=<model> Ollama model name (default: qwen2.5:14b)
+      --ollama.model=<model> Ollama model name (default: qwen3:14b)
       --anthropic.model=<model>
                              Anthropic model name (default: claude-sonnet-4-20250514)
 

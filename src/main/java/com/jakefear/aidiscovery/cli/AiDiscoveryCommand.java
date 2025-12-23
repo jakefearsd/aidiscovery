@@ -65,7 +65,7 @@ import java.util.function.Supplier;
                 "LLM Provider Options (Spring Boot properties):",
                 "  --llm.provider=<provider>       LLM provider: \"anthropic\" or \"ollama\" (default: anthropic)",
                 "  --ollama.base-url=<url>         Ollama server URL (default: http://localhost:11434)",
-                "  --ollama.model=<model>          Ollama model name (default: qwen2.5:14b)",
+                "  --ollama.model=<model>          Ollama model name (default: qwen3:14b)",
                 "  --anthropic.model=<model>       Anthropic model (default: claude-sonnet-4-20250514)",
                 "",
                 "Using Ollama (local inference - free):",

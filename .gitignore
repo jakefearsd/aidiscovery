@@ -32,3 +32,6 @@ logs/
 # Runtime
 *.jar
 !.mvn/wrapper/maven-wrapper.jar
+
+# Local backups
+formeruniverses/
