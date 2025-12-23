@@ -73,8 +73,9 @@ com.jakefear.aidiscovery
 │   ├── DiscoveryInteractiveSession.java  # 8-phase interactive mode
 │   ├── SessionLogger.java           # Session logging
 │   ├── curation/                    # Topic/relationship curation commands
-│   │   ├── topic/                   # Accept, Reject, Defer, Modify, SkipRest
-│   │   └── relationship/            # Confirm, Reject, ChangeType
+│   │   ├── SimpleCurationCommand.java  # Generic command with functional delegation
+│   │   ├── topic/                   # Modify, SkipRest (complex commands)
+│   │   └── relationship/            # ChangeType (complex command)
 │   ├── input/                       # Console input helpers
 │   └── phase/                       # Phase handlers (Seed, Scope, Review)
 │
@@ -93,6 +94,7 @@ com.jakefear.aidiscovery
 │
 ├── discovery/                       # Core discovery services
 │   ├── TopicExpander.java           # Topic suggestion generation
+│   ├── TopicPromptBuilder.java      # Composable prompt construction
 │   ├── TopicSuggestion.java         # Suggestion with scores
 │   ├── RelationshipSuggester.java   # Relationship analysis
 │   ├── RelationshipSuggestion.java  # Relationship with confidence
@@ -154,6 +156,44 @@ Each `TopicSuggestion` includes:
 - `searchConfidence` (0.0-1.0) - Wikidata validation confidence
 - `getCombinedScore()` - Weighted combination for curation decisions
 
+### TopicPromptBuilder
+
+Composable builder for constructing LLM prompts. Eliminates duplication across different prompt types:
+
+```java
+String prompt = TopicPromptBuilder.create()
+    .addDomainContext(domainName)
+    .addSeedTopic(seedTopic)
+    .addSearchContext(topicInfo, relatedTopics)  // Optional
+    .addExistingTopics(existingTopics)
+    .addScopeGuidance(scope)
+    .addSearchGroundedTask(suggestionsRange)     // Or addStandardTask()
+    .build();
+```
+
+Provides consistent prompt sections:
+- **Domain context** - Domain name and optional description
+- **Seed topic** - Topic being expanded
+- **Search context** - Grounding from Wikidata/Wikipedia
+- **Existing topics** - Duplicate prevention
+- **Scope guidance** - Assumed knowledge, exclusions, focus areas
+- **Task sections** - Standard, search-grounded, or initial topics
+
+### SimpleCurationCommand
+
+Generic command for simple curation actions that use functional delegation:
+
+```java
+// Factory creates commands with session method references
+new SimpleCurationCommand<>(
+    CurationAction.ACCEPT,
+    "Accepted",
+    DiscoverySession::acceptTopicSuggestion
+);
+```
+
+Consolidates 5 nearly-identical command classes into 1 parameterized class. Complex commands like `ModifyTopicCommand` and `ChangeTypeRelationshipCommand` remain as separate classes since they require user interaction.
+
 ### AutonomousCurator
 
 AI-powered decision maker for autonomous mode. Uses rules + AI:
@@ -196,6 +236,22 @@ Human-in-the-loop discovery with full control:
 | 6. Depth Calibration | Adjust word counts | Modify estimates per topic |
 | 7. Prioritization | Set generation order | Assign MUST/SHOULD/NICE_TO_HAVE |
 | 8. Review | Final approval | Confirm and save |
+
+**Phase Execution Pattern:**
+
+The `run()` method uses a helper pattern for consistent phase execution:
+
+```java
+// Each phase is executed with logging and cancellation handling
+if (!executePhase(DiscoveryPhase.SEED_INPUT, this::runSeedInputPhase)) return null;
+if (!executePhase(DiscoveryPhase.SCOPE_SETUP, this::runScopeSetupPhase)) return null;
+// ... remaining phases
+```
+
+The `executePhase()` helper handles:
+- Phase logging (`sessionLog.phase()`)
+- Cancellation detection and reporting
+- State logging after completion
 
 ### Autonomous Mode (6 Phases)
 

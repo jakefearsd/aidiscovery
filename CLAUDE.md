@@ -28,7 +28,14 @@ public interface CurationCommand<T> {
 }
 ```
 
-Implementations: `AcceptTopicCommand`, `RejectTopicCommand`, `ModifyTopicCommand`, `DeferTopicCommand`
+**Implementations:**
+- `SimpleCurationCommand<T>` - Generic command using functional delegation for accept/reject/defer/confirm actions
+- `ModifyTopicCommand` - Complex command with interactive topic modification logic
+
+```java
+// SimpleCurationCommand uses BiConsumer for session action
+new SimpleCurationCommand<>(CurationAction.ACCEPT, "Accepted", DiscoverySession::acceptTopicSuggestion);
+```
 
 **Factory:** `TopicCurationCommandFactory`, `RelationshipCurationCommandFactory`
 
@@ -46,13 +53,25 @@ public interface PhaseHandler {
 The `DiscoveryPhase` enum defines valid transitions via `next()` and `previous()`.
 
 ### Builder Pattern
-**Location:** `domain/Topic`, `domain/DomainContext`, `domain/ScopeConfiguration`
+**Location:** `domain/Topic`, `domain/DomainContext`, `domain/ScopeConfiguration`, `discovery/TopicPromptBuilder`
 
 Complex domain objects use builders:
 ```java
 Topic topic = Topic.builder("Machine Learning")
     .withDescription("Introduction to ML")
     .withComplexity(ComplexityLevel.INTERMEDIATE)
+    .build();
+```
+
+**TopicPromptBuilder** - Composable builder for LLM prompts:
+```java
+String prompt = TopicPromptBuilder.create()
+    .addDomainContext(domainName)
+    .addSeedTopic(seedTopic)
+    .addSearchContext(topicInfo, relatedTopics)
+    .addExistingTopics(existingTopics)
+    .addScopeGuidance(scope)
+    .addSearchGroundedTask(suggestionsRange)
     .build();
 ```
 
@@ -158,6 +177,16 @@ profile.autonomousMaxTopics()  // Hard cap
 profile.convergenceThreshold() // Quality threshold (0.3-0.5)
 ```
 
+### ConsoleInputHelper (cli/input/)
+Utilities for console input handling:
+```java
+// Parse comma-separated input into trimmed, non-empty list
+List<String> items = ConsoleInputHelper.parseCommaSeparated("item1, item2, item3");
+
+// Prompt for user input with validation
+InputResult result = input.prompt("Enter value", validator);
+```
+
 ## Testing
 
 **Run all tests:**
@@ -205,25 +234,29 @@ java -jar target/aidiscovery.jar --ifeellucky "Domain Name" \
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `DiscoveryInteractiveSession.java` | 1,122 | Main interactive session orchestrator |
+| `DiscoveryInteractiveSession.java` | 1,087 | Main interactive session orchestrator |
 | `AutonomousDiscoverySession.java` | 413 | Autonomous mode orchestrator |
-| `TopicExpander.java` | 616 | LLM-powered topic suggestions |
+| `TopicExpander.java` | 470 | LLM-powered topic suggestions |
+| `TopicPromptBuilder.java` | 265 | Composable LLM prompt construction |
 | `TopicUniverse.java` | 479 | Domain aggregate root |
 | `AiDiscoveryCommand.java` | 500+ | CLI entry point with autonomous options |
 | `AutonomousCurator.java` | 315 | AI-powered curation decisions |
 
 ## Development Guidelines
 
-1. **Add commands via factory** - New curation actions go through `*CurationCommandFactory`
+1. **Add commands via factory** - New curation actions use `SimpleCurationCommand` via `*CurationCommandFactory`; only create custom commands for complex interactive logic
 2. **Add phases via registry** - New phases implement `PhaseHandler` and register in `PhaseHandlerRegistry`
-3. **Keep DiscoveryInteractiveSession focused** - Extract complex logic to phase handlers
-4. **Test curation flows** - Each command needs tests for execute behavior
+3. **Keep DiscoveryInteractiveSession focused** - Use `executePhase()` helper for consistent phase execution
+4. **Build prompts with TopicPromptBuilder** - Use composable builder instead of string concatenation
+5. **Test curation flows** - Each command needs tests for execute behavior
 
 ## Anti-Patterns to Avoid
 
 - **Bypassing factories** - Always use factories to get commands
 - **Direct phase transitions** - Use `DiscoveryPhase.next()` not hardcoded values
 - **Modifying TopicUniverse directly** - Use its mutation methods that maintain invariants
+- **Creating single-use command classes** - Use `SimpleCurationCommand` with method reference
+- **String concatenation for prompts** - Use `TopicPromptBuilder` for maintainability
 
 ---
 
