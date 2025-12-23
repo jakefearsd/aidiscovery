@@ -510,10 +510,10 @@ public class DiscoveryInteractiveSession {
 
             // Get remaining suggestions for skip rest command
             List<TopicSuggestion> remaining = suggestions.subList(i + 1, suggestions.size());
-            CurationCommand<TopicSuggestion> command = topicCurationFactory.getCommand(action, remaining);
+            var commandOpt = topicCurationFactory.getCommand(action, remaining);
 
-            if (command != null) {
-                CurationResult result = command.execute(suggestion, session, input);
+            if (commandOpt.isPresent()) {
+                CurationResult result = commandOpt.get().execute(suggestion, session, input);
                 if (result.shouldQuit()) {
                     return false;
                 }
@@ -636,8 +636,9 @@ public class DiscoveryInteractiveSession {
                 return cancelSession();
             }
 
-            CurationCommand<RelationshipSuggestion> command = relationshipCurationFactory.getCommand(action);
-            if (command != null) {
+            var commandOpt = relationshipCurationFactory.getCommand(action);
+            if (commandOpt.isPresent()) {
+                var command = commandOpt.get();
                 sessionLog.debug("Executing command: %s", command.getClass().getSimpleName());
                 CurationResult result = command.execute(rel, session, input);
                 sessionLog.action("Relationship curation", result.outcome() + ": " + result.message());

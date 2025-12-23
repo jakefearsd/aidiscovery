@@ -98,6 +98,13 @@ public record Topic(
 
     /**
      * Generate a wiki-safe ID from a name.
+     * <p>
+     * Produces PascalCase IDs suitable for wiki page names (e.g., "ApacheKafka").
+     * This differs from {@link TopicUniverse#generateId(String)} which produces
+     * URL-friendly hyphenated IDs for filesystem storage.
+     *
+     * @param name the topic name to convert
+     * @return PascalCase ID with special characters removed
      */
     public static String generateId(String name) {
         return name.replaceAll("[^a-zA-Z0-9]+", "")

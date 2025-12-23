@@ -76,7 +76,14 @@ public record TopicUniverse(
     }
 
     /**
-     * Generate an ID from name.
+     * Generate a URL-safe ID from a universe name.
+     * <p>
+     * Produces lowercase hyphenated IDs suitable for filesystem and URLs
+     * (e.g., "event-driven-architecture"). This differs from {@link Topic#generateId(String)}
+     * which produces PascalCase IDs for wiki page compatibility.
+     *
+     * @param name the universe name to convert
+     * @return lowercase hyphenated ID safe for URLs and filenames
      */
     public static String generateId(String name) {
         return name.toLowerCase()

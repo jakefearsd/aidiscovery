@@ -6,6 +6,8 @@ import com.jakefear.aidiscovery.cli.curation.SimpleCurationCommand;
 import com.jakefear.aidiscovery.discovery.DiscoverySession;
 import com.jakefear.aidiscovery.discovery.RelationshipSuggestion;
 
+import java.util.Optional;
+
 /**
  * Factory for creating relationship curation commands based on user action.
  */
@@ -21,18 +23,18 @@ public class RelationshipCurationCommandFactory {
      * Get a command for the given action.
      *
      * @param action The user's action
-     * @return The command, or null for quit/unrecognized
+     * @return The command if recognized, empty for quit/unrecognized actions
      */
-    public CurationCommand<RelationshipSuggestion> getCommand(CurationAction action) {
+    public Optional<CurationCommand<RelationshipSuggestion>> getCommand(CurationAction action) {
         if (action == null) {
-            return confirmCommand; // Default to confirm for unrecognized input
+            return Optional.of(confirmCommand); // Default to confirm for unrecognized input
         }
-        return switch (action) {
+        return Optional.ofNullable(switch (action) {
             case CONFIRM, DEFAULT -> confirmCommand;
             case REJECT -> rejectCommand;
             case TYPE_CHANGE -> changeTypeCommand;
             default -> null;
-        };
+        });
     }
 
     /**

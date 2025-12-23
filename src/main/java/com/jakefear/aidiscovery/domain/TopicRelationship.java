@@ -5,6 +5,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.Instant;
 import java.util.Objects;
 
+import static com.jakefear.aidiscovery.discovery.ScoringConstants.DEFAULT_CONFIDENCE;
+
 /**
  * A relationship between two topics in the knowledge domain.
  */
@@ -68,7 +70,7 @@ public record TopicRelationship(
 
         // Defaults
         if (status == null) status = RelationshipStatus.SUGGESTED;
-        if (confidence < 0 || confidence > 1) confidence = 0.5;
+        if (confidence < 0 || confidence > 1) confidence = DEFAULT_CONFIDENCE;
         if (userNote == null) userNote = "";
         if (createdAt == null) createdAt = Instant.now();
         if (modifiedAt == null) modifiedAt = createdAt;
@@ -116,7 +118,15 @@ public record TopicRelationship(
     }
 
     /**
-     * Generate a unique ID for this relationship.
+     * Generate a composite key ID for this relationship.
+     * <p>
+     * Format: "{sourceId}_{TYPE}_{targetId}" (e.g., "MachineLearning_PREREQUISITE_OF_DeepLearning").
+     * This composite key pattern ensures uniqueness per source-type-target combination.
+     *
+     * @param sourceId the source topic ID
+     * @param targetId the target topic ID
+     * @param type the relationship type
+     * @return composite key ID encoding the full relationship
      */
     public static String generateId(String sourceId, String targetId, RelationshipType type) {
         return sourceId + "_" + type.name() + "_" + targetId;

@@ -7,6 +7,7 @@ import com.jakefear.aidiscovery.discovery.DiscoverySession;
 import com.jakefear.aidiscovery.discovery.TopicSuggestion;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Factory for creating topic curation commands based on user action.
@@ -26,24 +27,24 @@ public class TopicCurationCommandFactory {
      *
      * @param action The user's action
      * @param remainingSuggestions Remaining suggestions (for skip rest)
-     * @return The command, or null for quit/unrecognized
+     * @return The command if recognized, empty for quit/unrecognized actions
      */
-    public CurationCommand<TopicSuggestion> getCommand(
+    public Optional<CurationCommand<TopicSuggestion>> getCommand(
             CurationAction action,
             List<TopicSuggestion> remainingSuggestions) {
 
         if (action == null) {
-            return null;
+            return Optional.empty();
         }
 
-        return switch (action) {
+        return Optional.ofNullable(switch (action) {
             case ACCEPT, DEFAULT -> acceptCommand;
             case REJECT -> rejectCommand;
             case DEFER -> deferCommand;
             case MODIFY -> modifyCommand;
             case SKIP_REST -> new SkipRestTopicCommand(remainingSuggestions);
             default -> null;
-        };
+        });
     }
 
     /**
