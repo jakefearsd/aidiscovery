@@ -14,6 +14,8 @@ import org.springframework.stereotype.Component;
 
 import java.util.*;
 
+import static com.jakefear.aidiscovery.discovery.ScoringConstants.*;
+
 /**
  * AI-powered curator that makes autonomous ACCEPT/REJECT/DEFER decisions.
  * Uses existing confidence scores plus additional AI reasoning for borderline cases.
@@ -59,13 +61,13 @@ public class AutonomousCurator {
         // Rule 1: Auto-accept high-quality suggestions
         if (suggestion.meetsAutonomousThreshold(confidenceThreshold)) {
             return CurationDecision.accept("High confidence: score " +
-                    String.format("%.2f", suggestion.getCombinedScore()));
+                    String.format("%.2f", suggestion.getAutonomousQualityScore()));
         }
 
         // Rule 2: Auto-reject clearly low-quality suggestions
-        if (suggestion.shouldAutoReject()) {
+        if (suggestion.isAutoRejectCandidate()) {
             return CurationDecision.reject("Low quality: score " +
-                    String.format("%.2f", suggestion.getCombinedScore()) +
+                    String.format("%.2f", suggestion.getAutonomousQualityScore()) +
                     ", confidence " + String.format("%.2f", suggestion.searchConfidence()));
         }
 
@@ -96,7 +98,7 @@ public class AutonomousCurator {
         for (TopicSuggestion suggestion : suggestions) {
             if (suggestion.meetsAutonomousThreshold(confidenceThreshold)) {
                 decisions.add(CurationDecision.accept("High confidence"));
-            } else if (suggestion.shouldAutoReject()) {
+            } else if (suggestion.isAutoRejectCandidate()) {
                 decisions.add(CurationDecision.reject("Low quality"));
             } else if (context.isAlreadyProcessed(suggestion.name())) {
                 decisions.add(CurationDecision.reject("Duplicate"));
@@ -127,13 +129,13 @@ public class AutonomousCurator {
     public CurationDecision curateRelationship(RelationshipSuggestion suggestion,
                                                AutonomousContext context) {
         // High confidence relationships are auto-confirmed
-        if (suggestion.confidence() >= 0.8) {
+        if (suggestion.confidence() >= HIGH_CONFIDENCE_THRESHOLD) {
             return CurationDecision.accept("High confidence: " +
                     String.format("%.2f", suggestion.confidence()));
         }
 
         // Low confidence relationships are auto-rejected
-        if (suggestion.confidence() < 0.4) {
+        if (suggestion.confidence() < RELATIONSHIP_REJECT_THRESHOLD) {
             return CurationDecision.reject("Low confidence: " +
                     String.format("%.2f", suggestion.confidence()));
         }

@@ -5,6 +5,8 @@ import com.jakefear.aidiscovery.domain.ComplexityLevel;
 
 import java.util.Objects;
 
+import static com.jakefear.aidiscovery.discovery.ScoringConstants.*;
+
 /**
  * A suggested topic from the AI discovery process.
  * Contains the AI's analysis and recommendations before user curation.
@@ -36,10 +38,10 @@ public record TopicSuggestion(
         if (suggestedContentType == null) suggestedContentType = ContentType.CONCEPT;
         if (suggestedComplexity == null) suggestedComplexity = ComplexityLevel.INTERMEDIATE;
         if (suggestedWordCount <= 0) suggestedWordCount = suggestedComplexity.getMinWords();
-        if (relevanceScore < 0 || relevanceScore > 1) relevanceScore = 0.5;
+        if (relevanceScore < 0 || relevanceScore > 1) relevanceScore = DEFAULT_CONFIDENCE;
         if (rationale == null) rationale = "";
         if (sourceContext == null) sourceContext = "";
-        if (searchConfidence < 0 || searchConfidence > 1) searchConfidence = -1.0; // -1 means not validated
+        if (searchConfidence < 0 || searchConfidence > 1) searchConfidence = NOT_VALIDATED;
     }
 
     /**
@@ -48,7 +50,7 @@ public record TopicSuggestion(
     public static TopicSuggestion simple(String name, String description) {
         return new TopicSuggestion(
                 name, description, "", ContentType.CONCEPT,
-                ComplexityLevel.INTERMEDIATE, 1000, 0.5, "", "", -1.0
+                ComplexityLevel.INTERMEDIATE, 1000, DEFAULT_CONFIDENCE, "", "", NOT_VALIDATED
         );
     }
 
@@ -65,7 +67,7 @@ public record TopicSuggestion(
             String rationale) {
         return new TopicSuggestion(
                 name, description, category, contentType, complexity,
-                complexity.getMinWords(), relevance, rationale, "", -1.0
+                complexity.getMinWords(), relevance, rationale, "", NOT_VALIDATED
         );
     }
 
@@ -81,44 +83,49 @@ public record TopicSuggestion(
     }
 
     /**
-     * Check if this suggestion has been validated against search.
+     * Check if this suggestion has a search confidence score (has been validated against search).
+     * @return true if searchConfidence >= 0 (not the sentinel value)
      */
-    public boolean isSearchValidated() {
+    public boolean hasSearchConfidence() {
         return searchConfidence >= 0;
     }
 
     /**
-     * Get combined score for autonomous curation decisions.
+     * Get quality score for autonomous curation decisions.
      * Weighs relevance and search confidence to produce a single quality score.
+     * <p>
+     * Formula: (relevance * {@value #RELEVANCE_WEIGHT}) + (searchConfidence * {@value #SEARCH_CONFIDENCE_WEIGHT})
+     * For non-validated topics: relevance * {@value #NON_VALIDATED_PENALTY}
      *
      * @return Score from 0.0 to 1.0
      */
-    public double getCombinedScore() {
+    public double getAutonomousQualityScore() {
         if (searchConfidence < 0) {
             // Not search-validated: penalize but still consider relevance
-            return relevanceScore * 0.7;
+            return relevanceScore * NON_VALIDATED_PENALTY;
         }
         // Weighted combination: relevance matters more than search confirmation
-        return (relevanceScore * 0.6) + (searchConfidence * 0.4);
+        return (relevanceScore * RELEVANCE_WEIGHT) + (searchConfidence * SEARCH_CONFIDENCE_WEIGHT);
     }
 
     /**
      * Check if this suggestion meets the threshold for autonomous acceptance.
      *
-     * @param threshold Minimum combined score (typically 0.75)
+     * @param threshold Minimum quality score (typically 0.75)
      * @return true if suggestion should be auto-accepted
      */
     public boolean meetsAutonomousThreshold(double threshold) {
-        return getCombinedScore() >= threshold && searchConfidence >= 0.3;
+        return getAutonomousQualityScore() >= threshold && searchConfidence >= ACCEPT_SEARCH_THRESHOLD;
     }
 
     /**
-     * Check if this suggestion should be auto-rejected (likely low quality or hallucinated).
+     * Check if this suggestion is a candidate for automatic rejection (likely low quality or hallucinated).
      *
      * @return true if suggestion should be auto-rejected
      */
-    public boolean shouldAutoReject() {
-        return getCombinedScore() < 0.4 || (isSearchValidated() && searchConfidence < 0.2);
+    public boolean isAutoRejectCandidate() {
+        return getAutonomousQualityScore() < AUTO_REJECT_SCORE_THRESHOLD
+                || (hasSearchConfidence() && searchConfidence < AUTO_REJECT_SEARCH_THRESHOLD);
     }
 
     /**
@@ -126,9 +133,9 @@ public record TopicSuggestion(
      */
     public String getConfidenceIndicator() {
         if (searchConfidence < 0) return "⚪ Not validated";
-        if (searchConfidence >= 0.8) return "🟢 High confidence";
-        if (searchConfidence >= 0.5) return "🟡 Medium confidence";
-        if (searchConfidence >= 0.3) return "🟠 Low confidence";
+        if (searchConfidence >= HIGH_CONFIDENCE_THRESHOLD) return "🟢 High confidence";
+        if (searchConfidence >= MEDIUM_CONFIDENCE_THRESHOLD) return "🟡 Medium confidence";
+        if (searchConfidence >= LOW_CONFIDENCE_THRESHOLD) return "🟠 Low confidence";
         return "🔴 Not found in search";
     }
 
@@ -168,10 +175,10 @@ public record TopicSuggestion(
         private ContentType suggestedContentType = ContentType.CONCEPT;
         private ComplexityLevel suggestedComplexity = ComplexityLevel.INTERMEDIATE;
         private int suggestedWordCount = 1000;
-        private double relevanceScore = 0.5;
+        private double relevanceScore = DEFAULT_CONFIDENCE;
         private String rationale = "";
         private String sourceContext = "";
-        private double searchConfidence = -1.0;
+        private double searchConfidence = NOT_VALIDATED;
 
         public Builder(String name) {
             this.name = name;

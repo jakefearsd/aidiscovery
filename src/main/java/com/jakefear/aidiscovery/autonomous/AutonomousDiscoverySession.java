@@ -202,7 +202,7 @@ public class AutonomousDiscoverySession {
                     TopicSuggestion suggestion = suggestions.get(i);
                     AutonomousCurator.CurationDecision decision = decisions.get(i);
 
-                    if (suggestion.getCombinedScore() >= config.confidenceThreshold()) {
+                    if (suggestion.getAutonomousQualityScore() >= config.confidenceThreshold()) {
                         highQualityCount++;
                     }
 

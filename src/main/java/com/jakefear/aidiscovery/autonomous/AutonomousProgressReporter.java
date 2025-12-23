@@ -111,8 +111,8 @@ public class AutonomousProgressReporter {
         acceptedCount++;
         if (quiet) return;
 
-        String indicator = suggestion.isSearchValidated()
-                ? String.format("%.2f", suggestion.getCombinedScore())
+        String indicator = suggestion.hasSearchConfidence()
+                ? String.format("%.2f", suggestion.getAutonomousQualityScore())
                 : "unvalidated";
 
         out.printf("  + %s (%s)%n", suggestion.name(), indicator);

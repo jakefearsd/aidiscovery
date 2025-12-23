@@ -4,6 +4,8 @@ import com.jakefear.aidiscovery.domain.RelationshipType;
 
 import java.util.Objects;
 
+import static com.jakefear.aidiscovery.discovery.ScoringConstants.*;
+
 /**
  * A suggested relationship between topics from the AI discovery process.
  */
@@ -26,7 +28,7 @@ public record RelationshipSuggestion(
             throw new IllegalArgumentException("Cannot create self-referential relationship");
         }
 
-        if (confidence < 0 || confidence > 1) confidence = 0.5;
+        if (confidence < 0 || confidence > 1) confidence = DEFAULT_CONFIDENCE;
         if (rationale == null) rationale = "";
     }
 
@@ -37,7 +39,7 @@ public record RelationshipSuggestion(
             String source,
             String target,
             RelationshipType type) {
-        return new RelationshipSuggestion(source, target, type, 0.5, "");
+        return new RelationshipSuggestion(source, target, type, DEFAULT_CONFIDENCE, "");
     }
 
     /**
@@ -77,8 +79,8 @@ public record RelationshipSuggestion(
      * Get a short display format.
      */
     public String toDisplayString() {
-        String confidenceIndicator = confidence >= 0.8 ? "●" :
-                confidence >= 0.5 ? "◐" : "○";
+        String confidenceIndicator = confidence >= HIGH_CONFIDENCE_THRESHOLD ? "●" :
+                confidence >= MEDIUM_CONFIDENCE_THRESHOLD ? "◐" : "○";
         return String.format("%s %s ──[%s]──> %s",
                 confidenceIndicator,
                 sourceTopicName,
@@ -90,7 +92,7 @@ public record RelationshipSuggestion(
      * Check if this is a high-confidence suggestion.
      */
     public boolean isHighConfidence() {
-        return confidence >= 0.8;
+        return confidence >= HIGH_CONFIDENCE_THRESHOLD;
     }
 
     /**

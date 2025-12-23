@@ -56,6 +56,12 @@ public class DiscoveryInteractiveSession {
     }
 
     /**
+     * A seed topic with name and description.
+     * Replaces magic array indices for clearer code.
+     */
+    private record SeedTopic(String name, String description) {}
+
+    /**
      * Constructor with optional cost profile.
      *
      * @param in                   Input reader
@@ -228,7 +234,7 @@ public class DiscoveryInteractiveSession {
         out.println("These are the core topics you definitely want to cover.");
         out.println();
 
-        List<String[]> seeds = new ArrayList<>();
+        List<SeedTopic> seeds = new ArrayList<>();
         int seedNum = 1;
         while (true) {
             InputResponse topicResponse = input.promptOptional(
@@ -244,7 +250,7 @@ public class DiscoveryInteractiveSession {
             InputResponse descriptionResponse = input.promptOptional("  Brief description", "");
             String topicDesc = descriptionResponse.getValueOrDefault("");
 
-            seeds.add(new String[]{topicName, topicDesc});
+            seeds.add(new SeedTopic(topicName, topicDesc));
             seedNum++;
         }
 
@@ -256,7 +262,7 @@ public class DiscoveryInteractiveSession {
         // Mark one as landing page
         out.println();
         out.println("Which topic should be the main landing page?");
-        List<String> topicNames = seeds.stream().map(s -> s[0]).toList();
+        List<String> topicNames = seeds.stream().map(SeedTopic::name).toList();
         InputResponse landingResponse = input.promptSelection("Selection", topicNames, 0);
         if (landingResponse.isQuit()) {
             return cancelSession();
@@ -265,11 +271,11 @@ public class DiscoveryInteractiveSession {
 
         // Add topics to session
         for (int i = 0; i < seeds.size(); i++) {
-            String[] seed = seeds.get(i);
+            SeedTopic seed = seeds.get(i);
             if (i == landingIndex) {
-                session.addLandingPage(seed[0], seed[1]);
+                session.addLandingPage(seed.name(), seed.description());
             } else {
-                session.addSeedTopic(seed[0], seed[1]);
+                session.addSeedTopic(seed.name(), seed.description());
             }
         }
 
