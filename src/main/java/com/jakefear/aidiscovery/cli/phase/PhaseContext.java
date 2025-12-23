@@ -1,8 +1,10 @@
 package com.jakefear.aidiscovery.cli.phase;
 
+import com.jakefear.aidiscovery.cli.SessionLogger;
 import com.jakefear.aidiscovery.cli.curation.relationship.RelationshipCurationCommandFactory;
 import com.jakefear.aidiscovery.cli.curation.topic.TopicCurationCommandFactory;
 import com.jakefear.aidiscovery.cli.input.ConsoleInputHelper;
+import com.jakefear.aidiscovery.discovery.CostProfile;
 import com.jakefear.aidiscovery.discovery.DiscoverySession;
 import com.jakefear.aidiscovery.discovery.GapAnalyzer;
 import com.jakefear.aidiscovery.discovery.RelationshipSuggester;
@@ -24,6 +26,8 @@ public class PhaseContext {
     private final GapAnalyzer gapAnalyzer;
     private final TopicCurationCommandFactory topicCurationFactory;
     private final RelationshipCurationCommandFactory relationshipCurationFactory;
+    private CostProfile costProfile;
+    private SessionLogger sessionLog;
 
     public PhaseContext(
             ConsoleInputHelper input,
@@ -81,6 +85,28 @@ public class PhaseContext {
 
     public RelationshipCurationCommandFactory relationshipCurationFactory() {
         return relationshipCurationFactory;
+    }
+
+    public CostProfile costProfile() {
+        return costProfile;
+    }
+
+    /**
+     * Set the cost profile. Used during initialization.
+     */
+    public void setCostProfile(CostProfile costProfile) {
+        this.costProfile = costProfile;
+    }
+
+    public SessionLogger sessionLog() {
+        return sessionLog;
+    }
+
+    /**
+     * Set the session logger. Used during initialization.
+     */
+    public void setSessionLog(SessionLogger sessionLog) {
+        this.sessionLog = sessionLog;
     }
 
     /**

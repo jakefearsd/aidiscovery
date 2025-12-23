@@ -48,6 +48,14 @@ public class DiscoveryInteractiveSession {
     private SessionLogger sessionLog;
 
     /**
+     * Functional interface for phase execution.
+     */
+    @FunctionalInterface
+    private interface PhaseRunner {
+        boolean run() throws Exception;
+    }
+
+    /**
      * Constructor with optional cost profile.
      *
      * @param in                   Input reader
@@ -115,69 +123,15 @@ public class DiscoveryInteractiveSession {
 
             printWelcome();
 
-            // Phase 1: Domain name and seed topics
-            sessionLog.phase("SEED_INPUT", 1, 8);
-            if (!runSeedInputPhase()) {
-                sessionLog.sessionEnd(false, "User cancelled at seed input phase");
-                return null;
-            }
-            sessionLog.state("Seed input complete, session domain: " + session.getDomainName());
-
-            // Phase 2: Scope configuration (optional)
-            sessionLog.phase("SCOPE_SETUP", 2, 8);
-            if (!runScopeSetupPhase()) {
-                sessionLog.sessionEnd(false, "User cancelled at scope setup phase");
-                return null;
-            }
-            sessionLog.state("Scope setup complete");
-
-            // Phase 3: Topic expansion
-            sessionLog.phase("TOPIC_EXPANSION", 3, 8);
-            if (!runTopicExpansionPhase()) {
-                sessionLog.sessionEnd(false, "User cancelled at topic expansion phase");
-                return null;
-            }
-            sessionLog.state("Topic expansion complete, total topics: " + session.getAcceptedTopicCount());
-
-            // Phase 4: Relationship mapping
-            sessionLog.phase("RELATIONSHIP_MAPPING", 4, 8);
-            if (!runRelationshipMappingPhase()) {
-                sessionLog.sessionEnd(false, "User cancelled at relationship mapping phase");
-                return null;
-            }
-            sessionLog.state("Relationship mapping complete");
-
-            // Phase 5: Gap analysis
-            sessionLog.phase("GAP_ANALYSIS", 5, 8);
-            if (!runGapAnalysisPhase()) {
-                sessionLog.sessionEnd(false, "User cancelled at gap analysis phase");
-                return null;
-            }
-            sessionLog.state("Gap analysis complete");
-
-            // Phase 6: Depth calibration (optional)
-            sessionLog.phase("DEPTH_CALIBRATION", 6, 8);
-            if (!runDepthCalibrationPhase()) {
-                sessionLog.sessionEnd(false, "User cancelled at depth calibration phase");
-                return null;
-            }
-            sessionLog.state("Depth calibration complete");
-
-            // Phase 7: Prioritization
-            sessionLog.phase("PRIORITIZATION", 7, 8);
-            if (!runPrioritizationPhase()) {
-                sessionLog.sessionEnd(false, "User cancelled at prioritization phase");
-                return null;
-            }
-            sessionLog.state("Prioritization complete");
-
-            // Phase 8: Review and confirm
-            sessionLog.phase("REVIEW", 8, 8);
-            if (!runReviewPhase()) {
-                sessionLog.sessionEnd(false, "User cancelled at review phase");
-                return null;
-            }
-            sessionLog.state("Review phase complete");
+            // Execute all 8 phases
+            if (!executePhase(DiscoveryPhase.SEED_INPUT, this::runSeedInputPhase)) return null;
+            if (!executePhase(DiscoveryPhase.SCOPE_SETUP, this::runScopeSetupPhase)) return null;
+            if (!executePhase(DiscoveryPhase.TOPIC_EXPANSION, this::runTopicExpansionPhase)) return null;
+            if (!executePhase(DiscoveryPhase.RELATIONSHIP_MAPPING, this::runRelationshipMappingPhase)) return null;
+            if (!executePhase(DiscoveryPhase.GAP_ANALYSIS, this::runGapAnalysisPhase)) return null;
+            if (!executePhase(DiscoveryPhase.DEPTH_CALIBRATION, this::runDepthCalibrationPhase)) return null;
+            if (!executePhase(DiscoveryPhase.PRIORITIZATION, this::runPrioritizationPhase)) return null;
+            if (!executePhase(DiscoveryPhase.REVIEW, this::runReviewPhase)) return null;
 
             session.goToPhase(DiscoveryPhase.COMPLETE);
             TopicUniverse universe = session.buildUniverse();
@@ -198,6 +152,23 @@ public class DiscoveryInteractiveSession {
                 sessionLog.close();
             }
         }
+    }
+
+    /**
+     * Execute a discovery phase with logging.
+     *
+     * @param phase The phase being executed
+     * @param runner The phase runner function
+     * @return true if the phase completed successfully, false if cancelled
+     */
+    private boolean executePhase(DiscoveryPhase phase, PhaseRunner runner) throws Exception {
+        sessionLog.phase(phase.name(), phase.ordinal() + 1, 8);
+        if (!runner.run()) {
+            sessionLog.sessionEnd(false, "User cancelled at " + phase.getDisplayName() + " phase");
+            return false;
+        }
+        sessionLog.state(phase.getDisplayName() + " complete");
+        return true;
     }
 
     private void printWelcome() {
