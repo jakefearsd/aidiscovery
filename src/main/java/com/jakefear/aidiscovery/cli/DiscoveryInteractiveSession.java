@@ -363,31 +363,7 @@ public class DiscoveryInteractiveSession {
         printPhaseHeader("TOPIC EXPANSION", 3, 8, "Discover and curate related topics");
         sessionLog.info("Starting topic expansion phase");
 
-        // Build domain context from search BEFORE expansion
-        out.println("Gathering domain context from search...");
-        sessionLog.apiCall("TopicExpander", "buildDomainContext");
-        DomainContext domainContext = topicExpander.buildDomainContext(
-                session.getDomainName(),
-                session.getScope().domainDescription()
-        );
-        session.setDomainContext(domainContext);
-
-        // Show what was learned
-        if (domainContext.hasContent()) {
-            out.println("✓ Domain context established:");
-            if (!domainContext.domainSummary().isBlank()) {
-                String summary = domainContext.domainSummary();
-                if (summary.length() > 200) {
-                    summary = summary.substring(0, 200) + "...";
-                }
-                out.println("  Summary: " + summary);
-            }
-            if (!domainContext.keyThemes().isEmpty()) {
-                out.println("  Key themes: " + String.join(", ", domainContext.keyThemes()));
-            }
-            out.println();
-        }
-        sessionLog.apiResponse("TopicExpander", "Domain context built with " + domainContext.keyThemes().size() + " themes");
+        buildAndDisplayDomainContext();
 
         TopicUniverse current = session.buildUniverse();
         Set<String> existingNames = current.topics().stream()
@@ -557,6 +533,34 @@ public class DiscoveryInteractiveSession {
         };
     }
 
+    /**
+     * Build domain context from search and display what was learned.
+     */
+    private void buildAndDisplayDomainContext() {
+        out.println("Gathering domain context from search...");
+        sessionLog.apiCall("TopicExpander", "buildDomainContext");
+
+        DomainContext domainContext = topicExpander.buildDomainContext(
+                session.getDomainName(),
+                session.getScope().domainDescription()
+        );
+        session.setDomainContext(domainContext);
+
+        if (domainContext.hasContent()) {
+            out.println("✓ Domain context established:");
+            if (!domainContext.domainSummary().isBlank()) {
+                out.println("  Summary: " + truncate(domainContext.domainSummary(), 200));
+            }
+            if (!domainContext.keyThemes().isEmpty()) {
+                out.println("  Key themes: " + String.join(", ", domainContext.keyThemes()));
+            }
+            out.println();
+        }
+
+        sessionLog.apiResponse("TopicExpander",
+                "Domain context built with " + domainContext.keyThemes().size() + " themes");
+    }
+
     // ==================== Phase 4: Relationship Mapping ====================
 
     private boolean runRelationshipMappingPhase() throws Exception {
@@ -597,62 +601,8 @@ public class DiscoveryInteractiveSession {
         out.printf("Found %d potential relationships. Review the important ones:%n", suggestions.size());
         out.println();
 
-        // Show and curate relationship suggestions
-        // Create a copy to avoid ConcurrentModificationException when items are removed during iteration
-        List<RelationshipSuggestion> pending = new ArrayList<>(session.getPendingRelationshipSuggestions());
-        sessionLog.debug("Starting relationship curation with %d pending suggestions", pending.size());
-        int shown = 0;
-        int maxToShow = 15;
-
-        for (RelationshipSuggestion rel : pending) {
-            sessionLog.debug("Processing relationship %d/%d: %s -> %s",
-                    shown + 1, pending.size(), rel.sourceTopicName(), rel.targetTopicName());
-
-            if (shown >= maxToShow) {
-                out.println();
-                out.printf("Showing %d of %d relationships.%n", shown, pending.size());
-                InputResponse moreResponse = input.promptYesNo("Show more?", false);
-                sessionLog.userInput("Show more?", moreResponse.value());
-                if (moreResponse.isQuit() || "no".equals(moreResponse.value())) {
-                    // Auto-confirm remaining high-confidence
-                    sessionLog.info("Auto-processing remaining %d relationships", pending.size() - shown);
-                    autoProcessRemainingRelationships(pending.subList(shown, pending.size()));
-                    break;
-                }
-                maxToShow += 10;
-            }
-
-            displayRelationshipSuggestion(rel);
-            out.print("  " + relationshipCurationFactory.getMenuPrompt() + ": ");
-            out.flush();
-
-            String decision = readLine();
-            sessionLog.userInput("Relationship decision", decision);
-            CurationAction action = CurationAction.parse(decision);
-            sessionLog.debug("Parsed action: %s", action);
-
-            if (action == CurationAction.QUIT) {
-                sessionLog.info("User quit during relationship curation");
-                return cancelSession();
-            }
-
-            var commandOpt = relationshipCurationFactory.getCommand(action);
-            if (commandOpt.isPresent()) {
-                var command = commandOpt.get();
-                sessionLog.debug("Executing command: %s", command.getClass().getSimpleName());
-                CurationResult result = command.execute(rel, session, input);
-                sessionLog.action("Relationship curation", result.outcome() + ": " + result.message());
-                if (result.shouldQuit()) {
-                    sessionLog.info("Command requested quit");
-                    return cancelSession();
-                }
-                if (result.message() != null) {
-                    out.println("  " + getResultIcon(result) + " " + result.message());
-                }
-            } else {
-                sessionLog.warn("No command found for action: %s", action);
-            }
-            shown++;
+        if (!curateRelationshipSuggestions()) {
+            return false;
         }
 
         session.clearPendingRelationshipSuggestions();
@@ -678,6 +628,76 @@ public class DiscoveryInteractiveSession {
                 session.rejectRelationship(remaining);
             }
         }
+    }
+
+    /**
+     * Curate relationship suggestions with pagination.
+     *
+     * @return true if curation completed, false if user quit
+     */
+    private boolean curateRelationshipSuggestions() throws Exception {
+        List<RelationshipSuggestion> pending = new ArrayList<>(session.getPendingRelationshipSuggestions());
+        sessionLog.debug("Starting relationship curation with %d pending suggestions", pending.size());
+
+        int shown = 0;
+        int maxToShow = 15;
+
+        for (RelationshipSuggestion rel : pending) {
+            sessionLog.debug("Processing relationship %d/%d: %s -> %s",
+                    shown + 1, pending.size(), rel.sourceTopicName(), rel.targetTopicName());
+
+            // Check if we should show more or auto-process remaining
+            if (shown >= maxToShow) {
+                out.println();
+                out.printf("Showing %d of %d relationships.%n", shown, pending.size());
+                InputResponse moreResponse = input.promptYesNo("Show more?", false);
+                sessionLog.userInput("Show more?", moreResponse.value());
+
+                if (moreResponse.isQuit() || "no".equals(moreResponse.value())) {
+                    sessionLog.info("Auto-processing remaining %d relationships", pending.size() - shown);
+                    autoProcessRemainingRelationships(pending.subList(shown, pending.size()));
+                    return true;
+                }
+                maxToShow += 10;
+            }
+
+            // Display and get user decision
+            displayRelationshipSuggestion(rel);
+            out.print("  " + relationshipCurationFactory.getMenuPrompt() + ": ");
+            out.flush();
+
+            String decision = readLine();
+            sessionLog.userInput("Relationship decision", decision);
+            CurationAction action = CurationAction.parse(decision);
+            sessionLog.debug("Parsed action: %s", action);
+
+            if (action == CurationAction.QUIT) {
+                sessionLog.info("User quit during relationship curation");
+                return false;
+            }
+
+            // Execute the curation command
+            var commandOpt = relationshipCurationFactory.getCommand(action);
+            if (commandOpt.isPresent()) {
+                var command = commandOpt.get();
+                sessionLog.debug("Executing command: %s", command.getClass().getSimpleName());
+                CurationResult result = command.execute(rel, session, input);
+                sessionLog.action("Relationship curation", result.outcome() + ": " + result.message());
+
+                if (result.shouldQuit()) {
+                    sessionLog.info("Command requested quit");
+                    return false;
+                }
+                if (result.message() != null) {
+                    out.println("  " + getResultIcon(result) + " " + result.message());
+                }
+            } else {
+                sessionLog.warn("No command found for action: %s", action);
+            }
+            shown++;
+        }
+
+        return true;
     }
 
     // ==================== Phase 5: Gap Analysis ====================
@@ -708,25 +728,51 @@ public class DiscoveryInteractiveSession {
             return true;
         }
 
-        // Show assessment summary
-        if (result.assessment() != null) {
-            GapAnalyzer.OverallAssessment assessment = result.assessment();
-            out.println("Coverage Assessment:");
-            out.printf("  Coverage:      %s%.0f%%%n", getScoreBar(assessment.coverageScore()), assessment.coverageScore() * 100);
-            out.printf("  Balance:       %s%.0f%%%n", getScoreBar(assessment.balanceScore()), assessment.balanceScore() * 100);
-            out.printf("  Connectedness: %s%.0f%%%n", getScoreBar(assessment.connectednessScore()), assessment.connectednessScore() * 100);
-            if (!assessment.summary().isBlank()) {
-                out.println();
-                out.println("Summary: " + assessment.summary());
-            }
-            out.println();
-        }
+        displayCoverageAssessment(result.assessment());
 
-        // Show gaps
         out.printf("Found %d gaps to review:%n", result.gaps().size());
         out.println();
 
-        for (GapAnalyzer.Gap gap : result.gaps()) {
+        if (!processGapSuggestions(result.gaps())) {
+            return false;
+        }
+
+        session.clearPendingGaps();
+        out.println("✓ Gap analysis complete.");
+        session.advancePhase();
+        return true;
+    }
+
+    /**
+     * Display the coverage assessment summary.
+     */
+    private void displayCoverageAssessment(GapAnalyzer.OverallAssessment assessment) {
+        if (assessment == null) {
+            return;
+        }
+
+        out.println("Coverage Assessment:");
+        out.printf("  Coverage:      %s%.0f%%%n",
+                getScoreBar(assessment.coverageScore()), assessment.coverageScore() * 100);
+        out.printf("  Balance:       %s%.0f%%%n",
+                getScoreBar(assessment.balanceScore()), assessment.balanceScore() * 100);
+        out.printf("  Connectedness: %s%.0f%%%n",
+                getScoreBar(assessment.connectednessScore()), assessment.connectednessScore() * 100);
+
+        if (!assessment.summary().isBlank()) {
+            out.println();
+            out.println("Summary: " + assessment.summary());
+        }
+        out.println();
+    }
+
+    /**
+     * Process gap suggestions, prompting user to add suggested topics.
+     *
+     * @return true if processing completed, false if user quit
+     */
+    private boolean processGapSuggestions(List<GapAnalyzer.Gap> gaps) throws Exception {
+        for (GapAnalyzer.Gap gap : gaps) {
             String severityIcon = switch (gap.severity()) {
                 case CRITICAL -> "🔴";
                 case MODERATE -> "🟡";
@@ -743,7 +789,7 @@ public class DiscoveryInteractiveSession {
 
                 String decision = readLine();
                 if (decision == null || decision.equalsIgnoreCase("quit")) {
-                    return cancelSession();
+                    return false;
                 }
 
                 if (decision.isBlank() || decision.toLowerCase().startsWith("y")) {
@@ -765,9 +811,6 @@ public class DiscoveryInteractiveSession {
             out.println();
         }
 
-        session.clearPendingGaps();
-        out.println("✓ Gap analysis complete.");
-        session.advancePhase();
         return true;
     }
 
@@ -795,21 +838,8 @@ public class DiscoveryInteractiveSession {
         }
 
         List<Topic> topics = session.buildUniverse().getAcceptedTopics();
-        out.println();
-        out.println("Current topics and suggested word counts:");
-        out.println();
+        displayTopicsWithDepths(topics);
 
-        for (int i = 0; i < topics.size(); i++) {
-            Topic topic = topics.get(i);
-            int suggested = topic.complexity().getMinWords();
-            out.printf("  %2d. %-30s %s (%d words)%n",
-                    i + 1,
-                    truncate(topic.name(), 30),
-                    topic.complexity().getDisplayName(),
-                    suggested);
-        }
-
-        out.println();
         out.println("Enter topic number to adjust, or press Enter to finish:");
 
         while (true) {
@@ -844,6 +874,26 @@ public class DiscoveryInteractiveSession {
         out.println("\n✓ Depth calibration complete.");
         session.advancePhase();
         return true;
+    }
+
+    /**
+     * Display topics with their current depth/word count settings.
+     */
+    private void displayTopicsWithDepths(List<Topic> topics) {
+        out.println();
+        out.println("Current topics and suggested word counts:");
+        out.println();
+
+        for (int i = 0; i < topics.size(); i++) {
+            Topic topic = topics.get(i);
+            int suggested = topic.complexity().getMinWords();
+            out.printf("  %2d. %-30s %s (%d words)%n",
+                    i + 1,
+                    truncate(topic.name(), 30),
+                    topic.complexity().getDisplayName(),
+                    suggested);
+        }
+        out.println();
     }
 
     // ==================== Phase 7: Prioritization ====================

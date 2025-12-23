@@ -239,20 +239,34 @@ public class GapAnalyzer {
         return new GapAnalysisResult(gaps, assessment);
     }
 
-    private Gap parseGap(JsonNode node) {
-        GapType type;
+    /**
+     * Safely parse an enum value with a fallback default.
+     *
+     * @param enumClass the enum class to parse
+     * @param value the string value to parse
+     * @param defaultValue the default if parsing fails
+     * @return the parsed enum value or default
+     */
+    private <T extends Enum<T>> T parseEnumSafely(Class<T> enumClass, String value, T defaultValue) {
         try {
-            type = GapType.valueOf(JsonParsingUtils.getStringOrDefault(node, "type", "COVERAGE_GAP"));
+            return Enum.valueOf(enumClass, value);
         } catch (IllegalArgumentException e) {
-            type = GapType.COVERAGE_GAP;
+            return defaultValue;
         }
+    }
 
-        Severity severity;
-        try {
-            severity = Severity.valueOf(JsonParsingUtils.getStringOrDefault(node, "severity", "moderate").toUpperCase());
-        } catch (IllegalArgumentException e) {
-            severity = Severity.MODERATE;
-        }
+    private Gap parseGap(JsonNode node) {
+        GapType type = parseEnumSafely(
+                GapType.class,
+                JsonParsingUtils.getStringOrDefault(node, "type", "COVERAGE_GAP"),
+                GapType.COVERAGE_GAP
+        );
+
+        Severity severity = parseEnumSafely(
+                Severity.class,
+                JsonParsingUtils.getStringOrDefault(node, "severity", "moderate").toUpperCase(),
+                Severity.MODERATE
+        );
 
         List<String> affectedTopics = new ArrayList<>();
         JsonNode affected = node.get("affectedTopics");
