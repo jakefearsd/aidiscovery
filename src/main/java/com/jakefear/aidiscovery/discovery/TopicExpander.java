@@ -58,7 +58,7 @@ public class TopicExpander {
         """;
 
     public TopicExpander(
-            @Qualifier("researchChatModel") ChatLanguageModel model,
+            @Qualifier("creativeModel") ChatLanguageModel model,
             SearchProviderRegistry searchRegistry) {
         this.model = model;
         this.objectMapper = new ObjectMapper();
