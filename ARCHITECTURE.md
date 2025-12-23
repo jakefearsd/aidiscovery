@@ -103,7 +103,8 @@ com.jakefear.aidiscovery
 │   ├── DiscoverySession.java        # Session state management
 │   ├── DiscoveryPhase.java          # Phase enumeration
 │   ├── DomainContext.java           # Domain themes/glossary
-│   └── RelationshipDepth.java       # Relationship analysis depth
+│   ├── RelationshipDepth.java       # Relationship analysis depth
+│   └── ScoringConstants.java        # Centralized scoring thresholds
 │
 ├── domain/                          # Domain models
 │   ├── Topic.java                   # Topic entity
@@ -154,7 +155,9 @@ public List<TopicSuggestion> expandTopicWithSearch(
 Each `TopicSuggestion` includes:
 - `relevanceScore` (0.0-1.0) - LLM's assessment of topic relevance
 - `searchConfidence` (0.0-1.0) - Wikidata validation confidence
-- `getCombinedScore()` - Weighted combination for curation decisions
+- `getAutonomousQualityScore()` - Weighted combination for curation decisions
+- `hasSearchConfidence()` - Whether search validation was performed
+- `isAutoRejectCandidate()` - Whether score is below rejection threshold
 
 ### TopicPromptBuilder
 
@@ -194,17 +197,40 @@ new SimpleCurationCommand<>(
 
 Consolidates 5 nearly-identical command classes into 1 parameterized class. Complex commands like `ModifyTopicCommand` and `ChangeTypeRelationshipCommand` remain as separate classes since they require user interaction.
 
+### ScoringConstants
+
+Centralized scoring thresholds used across curation and autonomous decision-making:
+
+```java
+public final class ScoringConstants {
+    // Weight factors for combined scoring
+    public static final double RELEVANCE_WEIGHT = 0.6;
+    public static final double SEARCH_CONFIDENCE_WEIGHT = 0.4;
+
+    // Decision thresholds
+    public static final double HIGH_CONFIDENCE_THRESHOLD = 0.8;
+    public static final double ACCEPT_SEARCH_THRESHOLD = 0.3;
+    public static final double AUTO_REJECT_SCORE_THRESHOLD = 0.4;
+    public static final double AUTO_REJECT_SEARCH_THRESHOLD = 0.2;
+
+    // Default values
+    public static final double DEFAULT_CONFIDENCE = 0.5;
+    public static final double NOT_VALIDATED = -1.0;
+}
+```
+
 ### AutonomousCurator
 
-AI-powered decision maker for autonomous mode. Uses rules + AI:
+AI-powered decision maker for autonomous mode. Uses rules + AI with thresholds from `ScoringConstants`:
 
 ```
 FOR each TopicSuggestion:
-  combinedScore = (relevance * 0.6) + (searchConfidence * 0.4)
+  qualityScore = suggestion.getAutonomousQualityScore()
+  // = (relevance * RELEVANCE_WEIGHT) + (searchConfidence * SEARCH_CONFIDENCE_WEIGHT)
 
-  IF combinedScore >= 0.75 AND searchConfidence >= 0.3:
+  IF qualityScore >= 0.75 AND searchConfidence >= ACCEPT_SEARCH_THRESHOLD:
     AUTO_ACCEPT (high confidence)
-  ELSE IF combinedScore < 0.4 OR searchConfidence < 0.2:
+  ELSE IF qualityScore < AUTO_REJECT_SCORE_THRESHOLD OR searchConfidence < AUTO_REJECT_SEARCH_THRESHOLD:
     AUTO_REJECT (likely hallucinated)
   ELSE:
     ASK_AI for reasoning → ACCEPT/REJECT/DEFER
@@ -217,6 +243,18 @@ State management for the discovery process:
 - Maintains topic/relationship collections
 - Handles accept/reject/defer actions
 - Builds final TopicUniverse
+
+### ID Generation Patterns
+
+Different entities use different ID formats based on their purpose:
+
+| Entity | Method | Format | Example | Purpose |
+|--------|--------|--------|---------|---------|
+| Topic | `Topic.generateId()` | PascalCase | `"ApacheKafka"` | Wiki page names |
+| TopicUniverse | `TopicUniverse.generateId()` | lowercase-hyphen | `"event-driven-architecture"` | URLs, filenames |
+| TopicRelationship | `TopicRelationship.generateId()` | composite key | `"TopicA_PREREQUISITE_OF_TopicB"` | Uniqueness |
+
+These patterns are intentionally different to serve their specific use cases.
 
 ---
 
@@ -252,6 +290,19 @@ The `executePhase()` helper handles:
 - Phase logging (`sessionLog.phase()`)
 - Cancellation detection and reporting
 - State logging after completion
+
+**Phase Method Decomposition:**
+
+Each phase method is decomposed into focused helper methods for readability:
+
+| Phase | Extracted Helpers |
+|-------|-------------------|
+| Topic Expansion | `buildAndDisplayDomainContext()`, `curateTopicSuggestions()` |
+| Relationship Mapping | `curateRelationshipSuggestions()`, `displayRelationshipSuggestion()` |
+| Gap Analysis | `displayCoverageAssessment()`, `processGapSuggestions()` |
+| Depth Calibration | `displayTopicsWithDepths()` |
+
+This decomposition keeps phase methods focused on orchestration while delegating display and curation logic to dedicated helpers.
 
 ### Autonomous Mode (6 Phases)
 
